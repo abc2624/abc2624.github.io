@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows 9 安装程序</title>
+    <style>
+        /* 全局重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Sans Serif", "SimSun", sans-serif;
+        }
+ 
+        /* 模拟CRT扫描线 */
+        .crt-overlay::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                transparent 50%,
+                rgba(0, 0, 0, 0.05) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+        }
+ 
+        /* 重启/开机/关机过渡效果 */
+        .restart-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 99999;
+            font-size: 18px;
+        }
+ 
+        .restart-screen.active {
+            display: flex;
+        }
+ 
+        /* 开机提示样式 */
+        .boot-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #00ff00;
+            z-index: 99999;
+            font-family: "Courier New", monospace;
+            font-size: 16px;
+        }
+ 
+        .boot-screen.active {
+            display: flex;
+        }
+ 
+        .boot-prompt {
+            margin-top: 30px;
+            animation: blink 1s infinite;
+        }
+ 
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+ 
+        .restart-logo {
+            font-size: 48px;
+            margin-bottom: 30px;
+            animation: flicker 2s infinite;
+        }
+ 
+        .restart-text {
+            margin: 10px 0;
+            animation: fadeInOut 3s infinite;
+        }
+ 
+        .loading-bar {
+            width: 300px;
+            height: 20px;
+            border: 2px solid #fff;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+ 
+        .loading-fill {
+            height: 100%;
+            width: 0%;
+            background: #008080;
+            transition: width 0.5s ease;
+        }
+ 
+        /* 安装程序样式 */
+        body {
+            background-color: #008080;
+            color: #ffffff;
+            font-size: 14px;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+ 
+        .install-window {
+            width: 700px;
+            height: 500px;
+            background-color: #c0c0c0;
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0 #000;
+            position: relative;
+            overflow: hidden;
+            display: block;
+        }
+ 
+        /* Windows 9 桌面样式 */
+        .win9-desktop {
+            width: 100vw;
+            height: 100vh;
+            background-color: #008080;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: none;
+            z-index: 100;
+        }
+ 
+        .win9-desktop.active {
+            display: block;
+        }
+ 
+        /* 桌面图标 */
+        .desktop-icons {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 80px);
+            gap: 15px;
+        }
+ 
+        .desktop-icon {
+            width: 70px;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #fff;
+            cursor: pointer;
+        }
+ 
+        .icon-img {
+            width: 48px;
+            height: 48px;
+            background: #c0c0c0;
+            border: 1px solid #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+ 
+        .icon-text {
+            text-align: center;
+            font-size: 12px;
+            width: 100%;
+        }
+ 
+        /* 任务栏 */
+        .taskbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: #c0c0c0;
+            border-top: 2px solid #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            z-index: 101;
+        }
+ 
+        .start-button {
+            height: 24px;
+            padding: 0 10px;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #000;
+            border-bottom-color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+ 
+        .start-button:active {
+            border-top-color: #000;
+            border-left-color: #000;
+            border-right-color: #fff;
+            border-bottom-color: #fff;
+        }
+ 
+        /* 开始菜单 */
+        .start-menu {
+            position: fixed;
+            bottom: 30px;
+            left: 0;
+            width: 250px;
+            height: 400px;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #000;
+            border-bottom-color: #000;
+            display: none;
+            z-index: 102;
+            padding: 10px;
+        }
+ 
+        .start-menu.active {
+            display: block;
+        }
+ 
+        .start-menu-items {
+            margin-top: 10px;
+        }
+ 
+        .start-menu-item {
+            padding: 5px 10px;
+            cursor: pointer;
+            color: #000;
+            margin: 2px 0;
+        }
+ 
+        .start-menu-item:hover {
+            background: #000080;
+            color: #fff;
+        }
+ 
+        /* 窗口通用样式 */
+        .app-window {
+            width: 400px;
+            height: 300px;
+            background-color: #c0c0c0;
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0 #000;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 200;
+        }
+ 
+        .app-window.active {
+            display: block;
+        }
+ 
+        .app-title {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            color: #fff;
+            padding: 3px 8px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        }
+ 
+        .app-content {
+            padding: 10px;
+            height: calc(100% - 30px);
+            overflow-y: auto;
+            color: #000;
+        }
+ 
+        /* 记事本样式 */
+        .notepad-content {
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border: 2px solid #808080;
+            padding: 5px;
+            font-family: "Courier New", monospace;
+            resize: none;
+        }
+ 
+        /* 计算器样式 */
+        .calculator-content {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            padding: 10px;
+        }
+ 
+        .calc-btn {
+            padding: 10px;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #000;
+            border-bottom-color: #000;
+            cursor: pointer;
+            font-size: 16px;
+        }
+ 
+        .calc-btn:active {
+            border-top-color: #000;
+            border-left-color: #000;
+            border-right-color: #fff;
+            border-bottom-color: #fff;
+        }
+ 
+        .calc-display {
+            grid-column: 1 / 5;
+            height: 40px;
+            background: #fff;
+            border: 2px solid #808080;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 10px;
+            font-size: 18px;
+        }
+ 
+        /* 窗口标题栏 */
+        .window-title {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            color: #fff;
+            padding: 3px 8px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        }
+ 
+        .title-buttons {
+            display: flex;
+            gap: 2px;
+        }
+ 
+        .title-btn {
+            width: 18px;
+            height: 18px;
+            background-color: #c0c0c0;
+            border: 2px solid #c0c0c0;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #000;
+            border-bottom-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            cursor: pointer;
+        }
+ 
+        /* 安装程序内容区 */
+        .window-content {
+            padding: 15px;
+            color: #000;
+            height: calc(100% - 32px);
+            overflow-y: auto;
+        }
+ 
+        .install-steps {
+            display: flex;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #808080;
+        }
+ 
+        .step {
+            padding: 5px 15px;
+            background-color: #c0c0c0;
+            border: 2px solid;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #808080;
+            border-bottom-color: #808080;
+            margin-right: 5px;
+            font-weight: bold;
+            cursor: default;
+        }
+ 
+        .step.active {
+            background-color: #000080;
+            color: #fff;
+            border-color: #fff #808080 #808080 #fff;
+        }
+ 
+        .step-content {
+            display: none;
+        }
+ 
+        .step-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+ 
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+ 
+        .welcome-content {
+            text-align: center;
+            padding: 20px;
+        }
+ 
+        .welcome-content h2 {
+            margin-bottom: 20px;
+            color: #000080;
+        }
+ 
+        .welcome-content p {
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+ 
+        .license-content {
+            height: 250px;
+            overflow-y: auto;
+            border: 2px solid;
+            border-top-color: #808080;
+            border-left-color: #808080;
+            border-right-color: #fff;
+            border-bottom-color: #fff;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #fff;
+        }
+ 
+        .license-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+ 
+        .install-type-content {
+            padding: 20px;
+        }
+ 
+        .install-type-options {
+            margin: 20px 0;
+        }
+ 
+        .install-type-option {
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #808080;
+            cursor: pointer;
+        }
+ 
+        .install-type-option.selected {
+            background-color: #000080;
+            color: #fff;
+            border-color: #fff;
+        }
+ 
+        .progress-content {
+            padding: 20px;
+            text-align: center;
+        }
+ 
+        .progress-bar-container {
+            width: 80%;
+            height: 30px;
+            margin: 30px auto;
+            border: 2px solid;
+            border-top-color: #808080;
+            border-left-color: #808080;
+            border-right-color: #fff;
+            border-bottom-color: #fff;
+            background-color: #fff;
+            overflow: hidden;
+        }
+ 
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #000080;
+            transition: width 0.3s ease;
+        }
+ 
+        .progress-text {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+ 
+        .complete-content {
+            text-align: center;
+            padding: 40px 20px;
+        }
+ 
+        .complete-content h2 {
+            color: #000080;
+            margin-bottom: 30px;
+        }
+ 
+        .complete-content p {
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+ 
+        /* 按钮样式 */
+        .btn {
+            padding: 5px 15px;
+            background-color: #c0c0c0;
+            border: 2px solid;
+            border-top-color: #fff;
+            border-left-color: #fff;
+            border-right-color: #808080;
+            border-bottom-color: #808080;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            min-width: 80px;
+        }
+ 
+        .btn:active {
+            border-top-color: #808080;
+            border-left-color: #808080;
+            border-right-color: #fff;
+            border-bottom-color: #fff;
+        }
+ 
+        .btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #808080 #fff #fff #808080;
+        }
+ 
+        .btn-bar {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+        }
+ 
+        /* 动画效果 */
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+ 
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="crt-overlay">
+    <!-- 重启过渡界面 -->
+    <div class="restart-screen" id="restartScreen">
+        <div class="restart-logo">Windows 9</div>
+        <div class="restart-text">正在重启计算机...</div>
+        <div class="restart-text">请稍候，不要关闭电源</div>
+        <div class="loading-bar">
+            <div class="loading-fill" id="restartLoading"></div>
+        </div>
+    </div>
+ 
+    <!-- 开机界面 -->
+    <div class="boot-screen" id="bootScreen">
+        <div style="text-align: left; width: 80%; line-height: 1.5;">
+            <div>BIOS Version 9.00</div>
+            <div>Copyright (C) Microsoft Corporation</div>
+            <div>Detecting hardware...</div>
+            <div>Memory: 16384 MB OK</div>
+            <div>Hard Disk: 3 drives detected</div>
+            <div>CD-ROM: 1 drive detected</div>
+            <div>USB: 4 ports detected</div>
+            <div>Video: VGA Compatible Adapter</div>
+            <div></div>
+            <div>Press DEL to enter SETUP | Press F8 for Advanced Options</div>
+            <div></div>
+            <div>Starting Windows 9...</div>
+        </div>
+        <div class="boot-prompt">按 Enter 键开机</div>
+    </div>
+ 
+    <!-- 安装程序窗口 -->
+    <div class="install-window" id="installWindow">
+        <div class="window-title">
+            <span>Windows 9 安装程序</span>
+            <div class="title-buttons">
+                <div class="title-btn">_</div>
+                <div class="title-btn">□</div>
+                <div class="title-btn">×</div>
+            </div>
+        </div>
+ 
+        <div class="window-content">
+            <div class="install-steps">
+                <div class="step active" data-step="1">欢迎</div>
+                <div class="step" data-step="2">许可协议</div>
+                <div class="step" data-step="3">安装类型</div>
+                <div class="step" data-step="4">正在安装</div>
+                <div class="step" data-step="5">完成</div>
+            </div>
+ 
+            <div class="step-content active" id="step1">
+                <div class="welcome-content">
+                    <h2>欢迎使用 Windows 9 安装程序</h2>
+                    <p>感谢你选择 Windows 9！这个安装程序将引导你完成 Windows 9 的安装过程。</p>
+                    <p>在开始安装前，请确保你的计算机满足最低系统要求：</p>
+                    <ul style="text-align: left; margin: 0 auto; max-width: 400px; line-height: 1.5;">
+                        <li>处理器：1 GHz 或更快的 64 位 (x64) 处理器</li>
+                        <li>内存：2 GB RAM</li>
+                        <li>硬盘空间：64 GB 或更大的存储设备</li>
+                        <li>显卡：支持 DirectX 12 或更高版本</li>
+                        <li>显示器：分辨率至少 1024 x 768</li>
+                    </ul>
+                </div>
+            </div>
+ 
+            <div class="step-content" id="step2">
+                <div class="license-content">
+                    <h3 style="margin-bottom: 10px;">最终用户许可协议</h3>
+                    <p>END-USER LICENSE AGREEMENT FOR WINDOWS 9</p>
+                    <p>本最终用户许可协议（“协议”）是你（个人或单一实体）与 Microsoft Corporation（或其关联公司，下同）之间达成的法律协议，适用于你所安装的 Windows 9 软件产品。</p>
+                    <p>BY INSTALLING, COPYING, ACCESSING, OR OTHERWISE USING THE SOFTWARE, YOU ACCEPT AND AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO THESE TERMS, YOU MUST NOT USE THE SOFTWARE.</p>
+                    <p>1. 授予许可。本协议授予你以下权利：</p>
+                    <p>1.1 安装和使用。你可以在单台计算机上安装、使用、访问、显示和运行本软件的一个副本。</p>
+                    <p>1.2 许可转让。你可以永久性地将本协议和软件转让给另一方，前提是你不保留任何副本，且受让人同意本协议的条款。</p>
+                    <p>2. 许可限制。</p>
+                    <p>2.1 不得反向工程、反编译或反汇编。你不得尝试对软件进行反向工程、反编译或反汇编，除非适用法律明确允许此类行为，且仅在法律允许的范围内进行。</p>
+                    <p>2.2 不得修改。你不得修改、改编或创建软件的衍生作品。</p>
+                    <p>2.3 不得租赁。你不得租赁、出租或出借软件。</p>
+                    <p>3. 激活。软件使用技术保护措施来验证你是否拥有合法授权的软件副本。你必须按照 Microsoft 产品激活说明激活软件。</p>
+                    <p>4. 更新。Microsoft 可能会向你提供软件更新。更新可能自动下载并安装到你的计算机上。</p>
+                    <p>5. 终止。如果违反本协议的条款，Microsoft 可终止本协议。终止后，你必须销毁软件的所有副本。</p>
+                    <p>6. 免责声明。软件按“原样”提供，不提供任何明示或暗示的保证，包括但不限于对适销性、特定用途适用性和非侵权性的暗示保证。</p>
+                    <p>7. 责任限制。在任何情况下，Microsoft 或其供应商对任何间接、偶然、特殊、惩戒性或后果性损害（包括但不限于利润损失、数据丢失或业务中断）不承担责任。</p>
+                </div>
+                <div class="license-buttons">
+                    <button class="btn" id="accept-license">我接受</button>
+                    <button class="btn" id="decline-license">我拒绝</button>
+                </div>
+            </div>
+ 
+            <div class="step-content" id="step3">
+                <div class="install-type-content">
+                    <h3 style="margin-bottom: 15px;">选择安装类型</h3>
+                    <div class="install-type-options">
+                        <div class="install-type-option" id="type-upgrade">
+                            <h4>升级安装</h4>
+                            <p>保留你的文件、设置和应用程序，将当前系统升级到 Windows 9</p>
+                        </div>
+                        <div class="install-type-option" id="type-custom">
+                            <h4>自定义安装</h4>
+                            <p>全新安装 Windows 9，不保留任何文件、设置或应用程序（推荐）</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="step-content" id="step4">
+                <div class="progress-content">
+                    <h3>正在安装 Windows 9...</h3>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">准备安装... (0%)</div>
+                    <p style="margin-top: 20px;">安装过程中计算机可能会自动重启数次，请不要关闭电源。</p>
+                </div>
+            </div>
+ 
+            <div class="step-content" id="step5">
+                <div class="complete-content">
+                    <h2>Windows 9 安装完成！</h2>
+                    <p>恭喜你！Windows 9 已成功安装到你的计算机上。</p>
+                    <p>点击“完成”按钮将重启计算机，完成最后的配置步骤。</p>
+                    <p>首次启动时，你需要完成一些基本设置，包括创建用户账户、设置时区等。</p>
+                </div>
+            </div>
+ 
+            <div class="btn-bar">
+                <button class="btn" id="btn-back">上一步</button>
+                <button class="btn" id="btn-next">下一步</button>
+                <button class="btn" id="btn-cancel">取消</button>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- Windows 9 桌面 -->
+    <div class="win9-desktop" id="win9Desktop">
+        <!-- 桌面图标 -->
+        <div class="desktop-icons">
+            <div class="desktop-icon" data-app="notepad">
+                <div class="icon-img">📝</div>
+                <div class="icon-text">记事本</div>
+            </div>
+            <div class="desktop-icon" data-app="calculator">
+                <div class="icon-img">🧮</div>
+                <div class="icon-text">计算器</div>
+            </div>
+            <div class="desktop-icon" data-app="explorer">
+                <div class="icon-img">📂</div>
+                <div class="icon-text">我的电脑</div>
+            </div>
+            <div class="desktop-icon" data-app="browser">
+                <div class="icon-img">🌐</div>
+                <div class="icon-text">浏览器</div>
+            </div>
+            <div class="desktop-icon" data-app="settings">
+                <div class="icon-img">⚙️</div>
+                <div class="icon-text">控制面板</div>
+            </div>
+        </div>
+ 
+        <!-- 任务栏 -->
+        <div class="taskbar">
+            <div class="start-button" id="startButton">
+                <span>开始</span>
+            </div>
+        </div>
+ 
+        <!-- 开始菜单 -->
+        <div class="start-menu" id="startMenu">
+            <h3 style="color: #000; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #808080;">程序</h3>
+            <div class="start-menu-items">
+                <div class="start-menu-item" data-app="notepad">记事本</div>
+                <div class="start-menu-item" data-app="calculator">计算器</div>
+                <div class="start-menu-item" data-app="explorer">我的电脑</div>
+                <div class="start-menu-item" data-app="browser">浏览器</div>
+                <div class="start-menu-item" data-app="settings">控制面板</div>
+                <div class="start-menu-item" id="shutdownItem" style="margin-top: 20px; border-top: 1px solid #808080; padding-top: 5px;">关闭计算机</div>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- 记事本窗口 -->
+    <div class="app-window" id="notepadWindow">
+        <div class="app-title">
+            <span>记事本 - Windows 9</span>
+            <div class="title-buttons">
+                <div class="title-btn app-close" data-app="notepad">×</div>
+            </div>
+        </div>
+        <div class="app-content">
+            <textarea class="notepad-content">欢迎使用 Windows 9 记事本！
+这是模拟的 Windows 9 系统功能。
+ 
+你可以在这里输入和编辑文本。
+Windows 9 - 全新体验，经典回归！</textarea>
+        </div>
+    </div>
+ 
+    <!-- 计算器窗口 -->
+    <div class="app-window" id="calculatorWindow" style="width: 300px; height: 350px;">
+        <div class="app-title">
+            <span>计算器 - Windows 9</span>
+            <div class="title-buttons">
+                <div class="title-btn app-close" data-app="calculator">×</div>
+            </div>
+        </div>
+        <div class="app-content calculator-content">
+            <div class="calc-display" id="calcDisplay">0</div>
+            <button class="calc-btn">7</button>
+            <button class="calc-btn">8</button>
+            <button class="calc-btn">9</button>
+            <button class="calc-btn">÷</button>
+            <button class="calc-btn">4</button>
+            <button class="calc-btn">5</button>
+            <button class="calc-btn">6</button>
+            <button class="calc-btn">×</button>
+            <button class="calc-btn">1</button>
+            <button class="calc-btn">2</button>
+            <button class="calc-btn">3</button>
+            <button class="calc-btn">-</button>
+            <button class="calc-btn">0</button>
+            <button class="calc-btn">.</button>
+            <button class="calc-btn">=</button>
+            <button class="calc-btn">+</button>
+            <button class="calc-btn" style="grid-column: 1 / 3;">C</button>
+            <button class="calc-btn">←</button>
+            <button class="calc-btn">±</button>
+        </div>
+    </div>
+ 
+    <!-- 我的电脑窗口 -->
+    <div class="app-window" id="explorerWindow" style="width: 500px; height: 400px;">
+        <div class="app-title">
+            <span>我的电脑 - Windows 9</span>
+            <div class="title-buttons">
+                <div class="title-btn app-close" data-app="explorer">×</div>
+            </div>
+        </div>
+        <div class="app-content">
+            <h3 style="margin-bottom: 15px;">驱动器</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                <div style="border: 2px solid #808080; padding: 10px; text-align: center;">
+                    <div style="font-size: 32px; margin-bottom: 5px;">🖥️</div>
+                    <div>C: 本地磁盘</div>
+                    <div>可用空间: 87.5 GB / 120 GB</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; text-align: center;">
+                    <div style="font-size: 32px; margin-bottom: 5px;">💾</div>
+                    <div>D: 数据盘</div>
+                    <div>可用空间: 245 GB / 500 GB</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; text-align: center;">
+                    <div style="font-size: 32px; margin-bottom: 5px;">📁</div>
+                    <div>E: 备份盘</div>
+                    <div>可用空间: 180 GB / 200 GB</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <h4>Windows 9 系统信息</h4>
+                <ul style="margin-top: 10px; line-height: 1.6;">
+                    <li>操作系统: Windows 9 专业版 64位 (Build 9200)</li>
+                    <li>处理器: Intel Core i5-12400F @ 2.50 GHz</li>
+                    <li>内存: 16.0 GB RAM</li>
+                    <li>系统类型: 64位操作系统, 基于x64的处理器</li>
+                    <li>安装日期: 2026/01/05</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- 浏览器窗口 -->
+    <div class="app-window" id="browserWindow" style="width: 600px; height: 450px;">
+        <div class="app-title">
+            <span>Internet Explorer 12 - Windows 9</span>
+            <div class="title-buttons">
+                <div class="title-btn app-close" data-app="browser">×</div>
+            </div>
+        </div>
+        <div class="app-content" style="padding: 0; height: calc(100% - 30px);">
+            <div style="padding: 5px; background: #c0c0c0; border-bottom: 1px solid #808080;">
+                <input type="text" style="width: 80%; padding: 3px; border: 2px solid; border-top-color: #808080; border-left-color: #808080; border-right-color: #fff; border-bottom-color: #fff;" value="https://www.microsoft.com/windows9" readonly>
+                <button class="btn" style="padding: 3px 10px; font-size: 12px;">访问</button>
+            </div>
+            <div style="padding: 15px; height: calc(100% - 30px); overflow-y: auto; background: #fff;">
+                <h2 style="color: #000080; margin-bottom: 20px;">欢迎使用 Windows 9 浏览器</h2>
+                <p style="margin-bottom: 15px; line-height: 1.6; color: #000;">
+                    这是 Windows 9 内置的 Internet Explorer 12 浏览器，基于全新的引擎构建，提供更快的浏览速度和更好的兼容性。
+                </p>
+                <p style="margin-bottom: 15px; line-height: 1.6; color: #000;">
+                    Windows 9 带来了诸多创新功能：
+                </p>
+                <ul style="margin-bottom: 20px; line-height: 1.6; color: #000; padding-left: 20px;">
+                    <li>全新的开始菜单，融合经典与现代设计</li>
+                    <li>增强的性能和安全性</li>
+                    <li>更好的多任务处理能力</li>
+                    <li>原生支持最新的硬件和软件</li>
+                </ul>
+                <div style="background: #f0f0f0; padding: 10px; border: 1px solid #808080; color: #000;">
+                    <strong>提示:</strong> 这是模拟的浏览器界面，仅用于展示 Windows 9 的视觉风格。
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- 控制面板窗口 -->
+    <div class="app-window" id="settingsWindow" style="width: 500px; height: 400px;">
+        <div class="app-title">
+            <span>控制面板 - Windows 9</span>
+            <div class="title-buttons">
+                <div class="title-btn app-close" data-app="settings">×</div>
+            </div>
+        </div>
+        <div class="app-content">
+            <h3 style="margin-bottom: 15px;">Windows 9 控制面板</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">👤</div>
+                    <div>用户账户</div>
+                    <div style="font-size: 12px; color: #666;">更改账户设置</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🖥️</div>
+                    <div>显示设置</div>
+                    <div style="font-size: 12px; color: #666;">调整分辨率和亮度</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🔊</div>
+                    <div>声音设置</div>
+                    <div style="font-size: 12px; color: #666;">调整音量和音效</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🔌</div>
+                    <div>设备管理器</div>
+                    <div style="font-size: 12px; color: #666;">管理硬件设备</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🕒</div>
+                    <div>日期和时间</div>
+                    <div style="font-size: 12px; color: #666;">设置时区和时间</div>
+                </div>
+                <div style="border: 2px solid #808080; padding: 10px; cursor: pointer;">
+                    <div style="font-size: 24px; margin-bottom: 5px;">🛡️</div>
+                    <div>安全中心</div>
+                    <div style="font-size: 12px; color: #666;">保护你的计算机</div>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        // 安装程序核心变量
+        let currentStep = 1;
+        let licenseAccepted = false;
+        let installTypeSelected = false;
+        let progressTimer = null;
+        let systemState = 'install'; // install: 安装界面, desktop: 桌面, shutdown: 关机状态
+ 
+        // DOM 元素
+        const steps = document.querySelectorAll('.step');
+        const stepContents = document.querySelectorAll('.step-content');
+        const btnBack = document.getElementById('btn-back');
+        const btnNext = document.getElementById('btn-next');
+        const btnCancel = document.getElementById('btn-cancel');
+        const acceptLicenseBtn = document.getElementById('accept-license');
+        const declineLicenseBtn = document.getElementById('decline-license');
+        const installTypeOptions = document.querySelectorAll('.install-type-option');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const restartScreen = document.getElementById('restartScreen');
+        const restartLoading = document.getElementById('restartLoading');
+        const installWindow = document.getElementById('installWindow');
+        const win9Desktop = document.getElementById('win9Desktop');
+        const startButton = document.getElementById('startButton');
+        const startMenu = document.getElementById('startMenu');
+        const bootScreen = document.getElementById('bootScreen');
+ 
+        // 更新安装步骤
+        function updateStep(step) {
+            stepContents.forEach(content => content.classList.remove('active'));
+            steps.forEach(s => s.classList.remove('active'));
+             
+            document.getElementById(`step${step}`).classList.add('active');
+            steps[step - 1].classList.add('active');
+             
+            btnBack.disabled = step === 1;
+            btnBack.classList.toggle('disabled', step === 1);
+             
+            btnNext.textContent = step === 4 ? '安装中...' : (step === 5 ? '完成' : '下一步');
+            btnNext.disabled = false;
+            btnNext.classList.remove('disabled');
+ 
+            if (step === 2 && !licenseAccepted) {
+                btnNext.disabled = true;
+                btnNext.classList.add('disabled');
+            }
+             
+            if (step === 3 && !installTypeSelected) {
+                btnNext.disabled = true;
+                btnNext.classList.add('disabled');
+            }
+             
+            if (step === 4) {
+                btnNext.disabled = true;
+                btnNext.classList.add('disabled');
+                startInstallProgress();
+            }
+             
+            if (step === 5) {
+                btnBack.disabled = true;
+                btnBack.classList.add('disabled');
+            }
+        }
+ 
+        // 模拟安装进度
+        function startInstallProgress() {
+            let progress = 0;
+            const progressTexts = [
+                "准备安装...",
+                "复制文件...",
+                "展开文件...",
+                "安装功能...",
+                "安装更新...",
+                "配置系统...",
+                "完成安装..."
+            ];
+             
+            clearInterval(progressTimer);
+            progressTimer = setInterval(() => {
+                progress += Math.random() * 2;
+                 
+                // 模拟安装过程中重启
+                if (progress > 40 && progress < 45) {
+                    clearInterval(progressTimer);
+                    simulateRestart(() => {
+                        // 重启后继续安装
+                        progress = 45;
+                        progressTimer = setInterval(() => {
+                            progress += Math.random() * 2;
+                            updateProgress(progress, progressTexts);
+                        }, 200);
+                    });
+                } else {
+                    updateProgress(progress, progressTexts);
+                }
+            }, 200);
+        }
+ 
+        // 更新进度条
+        function updateProgress(progress, texts) {
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(progressTimer);
+                setTimeout(() => {
+                    currentStep = 5;
+                    updateStep(currentStep);
+                }, 1000);
+            }
+             
+            const textIndex = Math.min(Math.floor(progress / 15), texts.length - 1);
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `${texts[textIndex]} (${Math.round(progress)}%)`;
+        }
+ 
+        // 模拟系统重启
+        function simulateRestart(callback) {
+            installWindow.style.display = 'none';
+            restartScreen.classList.add('active');
+             
+            let restartProgress = 0;
+            const restartTimer = setInterval(() => {
+                restartProgress += Math.random() * 1.5;
+                restartLoading.style.width = `${restartProgress}%`;
+                 
+                if (restartProgress >= 100) {
+                    restartProgress = 100;
+                    clearInterval(restartTimer);
+                     
+                    // 重启完成，隐藏重启界面，显示安装窗口
+                    setTimeout(() => {
+                        restartScreen.classList.remove('active');
+                        installWindow.style.display = 'block';
+                        callback();
+                    }, 1500);
+                }
+            }, 100);
+        }
+ 
+        // 完成安装并进入Windows 9桌面
+        function completeInstallation() {
+            simulateRestart(() => {
+                installWindow.style.display = 'none';
+                win9Desktop.classList.add('active');
+                systemState = 'desktop';
+                alert('Windows 9 已成功启动！现在你可以体验完整的 Windows 9 功能。');
+            });
+        }
+ 
+        // 模拟开机流程
+        function bootSystem() {
+            bootScreen.classList.remove('active');
+            restartScreen.classList.add('active');
+            restartScreen.innerHTML = `
+                <div class="restart-logo">Windows 9</div>
+                <div class="restart-text">正在启动 Windows 9...</div>
+                <div class="restart-text">请稍候...</div>
+                <div class="loading-bar">
+                    <div class="loading-fill" style="width: 0%;" id="bootLoading"></div>
+                </div>
+            `;
+             
+            const bootLoading = document.getElementById('bootLoading');
+            let bootProgress = 0;
+            const bootTimer = setInterval(() => {
+                bootProgress += Math.random() * 2;
+                bootLoading.style.width = `${bootProgress}%`;
+                 
+                if (bootProgress >= 100) {
+                    bootProgress = 100;
+                    clearInterval(bootTimer);
+                     
+                    setTimeout(() => {
+                        restartScreen.classList.remove('active');
+                        if (systemState === 'install') {
+                            installWindow.style.display = 'block';
+                        } else if (systemState === 'desktop') {
+                            win9Desktop.classList.add('active');
+                        }
+                    }, 1000);
+                }
+            }, 100);
+        }
+ 
+        // 下一步按钮
+        btnNext.addEventListener('click', () => {
+            if (currentStep < 5) {
+                currentStep++;
+                updateStep(currentStep);
+            } else if (currentStep === 5) {
+                completeInstallation();
+            }
+        });
+ 
+        // 上一步按钮
+        btnBack.addEventListener('click', () => {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStep(currentStep);
+            }
+        });
+ 
+        // 取消按钮
+        btnCancel.addEventListener('click', () => {
+            if (confirm('确定要取消 Windows 9 安装吗？')) {
+                alert('安装已取消。你的计算机将不会被修改。');
+                currentStep = 1;
+                licenseAccepted = false;
+                installTypeSelected = false;
+                updateStep(currentStep);
+            }
+        });
+ 
+        // 许可协议
+        acceptLicenseBtn.addEventListener('click', () => {
+            licenseAccepted = true;
+            btnNext.disabled = false;
+            btnNext.classList.remove('disabled');
+            alert('你已接受许可协议，可以继续安装。');
+        });
+ 
+        declineLicenseBtn.addEventListener('click', () => {
+            alert('你必须接受许可协议才能继续安装 Windows 9。');
+        });
+ 
+        // 选择安装类型
+        installTypeOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                installTypeOptions.forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                installTypeSelected = true;
+                btnNext.disabled = false;
+                btnNext.classList.remove('disabled');
+                 
+                const type = option.id === 'type-upgrade' ? '升级安装' : '自定义安装';
+                alert(`你选择了${type}。点击下一步开始安装。`);
+            });
+        });
+ 
+        // 步骤点击切换
+        steps.forEach(step => {
+            step.addEventListener('click', () => {
+                const stepNum = parseInt(step.dataset.step);
+                if (stepNum <= currentStep && !(stepNum === 4 && currentStep < 4)) {
+                    currentStep = stepNum;
+                    updateStep(currentStep);
+                }
+            });
+        });
+ 
+        // Windows 9 桌面功能
+        // 开始菜单切换
+        startButton.addEventListener('click', () => {
+            startMenu.classList.toggle('active');
+        });
+ 
+        // 点击桌面空白处关闭开始菜单
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.taskbar') && !e.target.closest('.start-menu')) {
+                startMenu.classList.remove('active');
+            }
+        });
+ 
+        // 打开应用程序
+        function openApp(appName) {
+            // 关闭所有应用
+            document.querySelectorAll('.app-window').forEach(win => {
+                win.classList.remove('active');
+            });
+             
+            // 打开指定应用
+            const appWindow = document.getElementById(`${appName}Window`);
+            if (appWindow) {
+                appWindow.classList.add('active');
+                startMenu.classList.remove('active');
+            }
+        }
+ 
+        // 桌面图标点击
+        document.querySelectorAll('.desktop-icon').forEach(icon => {
+            icon.addEventListener('click', () => {
+                const appName = icon.dataset.app;
+                openApp(appName);
+            });
+        });
+ 
+        // 开始菜单项目点击
+        document.querySelectorAll('.start-menu-item').forEach(item => {
+            if (item.id !== 'shutdownItem') {
+                item.addEventListener('click', () => {
+                    const appName = item.dataset.app;
+                    openApp(appName);
+                });
+            }
+        });
+ 
+        // 关闭应用程序
+        document.querySelectorAll('.app-close').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const appName = btn.dataset.app;
+                const appWindow = document.getElementById(`${appName}Window`);
+                appWindow.classList.remove('active');
+            });
+        });
+ 
+        // 关闭计算机
+        document.getElementById('shutdownItem').addEventListener('click', () => {
+            if (confirm('确定要关闭计算机吗？')) {
+                alert('Windows 9 正在关闭...');
+                setTimeout(() => {
+                    win9Desktop.classList.remove('active');
+                    restartScreen.classList.add('active');
+                    restartScreen.innerHTML = `
+                        <div class="restart-logo">Windows 9</div>
+                        <div class="restart-text">正在关闭计算机...</div>
+                        <div class="restart-text">请稍候...</div>
+                        <div class="loading-bar">
+                            <div class="loading-fill" style="width: 100%;"></div>
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        restartScreen.classList.remove('active');
+                        // 显示开机界面
+                        bootScreen.classList.add('active');
+                        systemState = 'desktop';
+                        alert('计算机已关闭。按 Enter 键可以重新开机。');
+                    }, 3000);
+                }, 1000);
+            }
+        });
+ 
+        // 监听Enter键开机
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && bootScreen.classList.contains('active')) {
+                bootSystem();
+            }
+        });
+ 
+        // 计算器功能简化实现
+        let calcValue = '0';
+        const calcDisplay = document.getElementById('calcDisplay');
+        document.querySelectorAll('.calc-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const text = btn.textContent;
+                if (text === 'C') {
+                    calcValue = '0';
+                } else if (text === '←') {
+                    calcValue = calcValue.length > 1 ? calcValue.slice(0, -1) : '0';
+                } else if (text === '±') {
+                    calcValue = calcValue.startsWith('-') ? calcValue.slice(1) : `-${calcValue}`;
+                } else if (text === '=') {
+                    try {
+                        // 替换乘除符号
+                        let expression = calcValue.replace('×', '*').replace('÷', '/');
+                        calcValue = eval(expression).toString();
+                    } catch (e) {
+                        calcValue = '错误';
+                    }
+                } else {
+                    calcValue = calcValue === '0' ? text : calcValue + text;
+                }
+                calcDisplay.textContent = calcValue;
+            });
+        });
+ 
+        // 初始化
+        updateStep(currentStep);
+    </script>
+</body>
+</html>
